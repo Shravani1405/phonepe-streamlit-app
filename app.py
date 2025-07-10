@@ -4,7 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 # Load the dataset
-!git clone https://github.com/PhonePe/pulse.git
+# !git clone https://github.com/PhonePe/pulse.git
 import os
 import json
 data=[]
