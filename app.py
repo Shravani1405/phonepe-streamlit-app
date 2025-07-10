@@ -2,29 +2,49 @@ import streamlit as st
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-
-# Load the dataset
-# !git clone https://github.com/PhonePe/pulse.git
 import os
-import json
-data=[]
-root="pulse/data/aggregated/transaction/country/india/state"
-for state in os.listdir(root):
-    for year in os.listdir(f"{root}/{state}"):
-        for file in os.listdir(f"{root}/{state}/{year}"):
-            path=f"{root}/{state}/{year}/{file}"
-            with open(path) as f:
-                d=json.load(f).get("data", {}).get("transactionData", [])
-            q=int(file.replace(".json",""))
-            for e in d:
-                data.append({
-                    "state": state.replace("-", " ").title(),
-                    "year": int(year),
-                    "quarter": q,
-                    "transaction_type": e["name"],
-                    "count": e["paymentInstruments"][0]["count"],
-                    "amount": e["paymentInstruments"][0]["amount"]
-                })
+
+# Title
+st.title(" PhonePe Pulse Data Visualization")
+
+# Data path
+DATA_PATH = "pulse/data/aggregated/transaction/country/india/state/"
+
+# Load data
+@st.cache_data
+def load_data():
+    all_data = []
+
+    for state in os.listdir(DATA_PATH):
+        state_path = os.path.join(DATA_PATH, state)
+        for year in os.listdir(state_path):
+            year_path = os.path.join(state_path, year)
+            for quarter_file in os.listdir(year_path):
+                file_path = os.path.join(year_path, quarter_file)
+                df = pd.read_json(file_path)
+                df['state'] = state
+                df['year'] = int(year)
+                df['quarter'] = int(quarter_file.strip('.json'))
+                all_data.append(df)
+
+    return pd.concat(all_data, ignore_index=True)
+
+try:
+    data = load_data()
+
+    st.subheader("Raw Transaction Data")
+    st.write(data.head())
+
+    st.subheader("Transactions by State")
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    sns.barplot(data=data, x='state', y='data.transactionData[0].paymentInstruments[0].amount', ci=None, ax=ax)
+    plt.xticks(rotation=90)
+    st.pyplot(fig)
+
+except Exception as e:
+    st.error(f" An error occurred: {e}")
+    st.info(" Make sure the `pulse/` directory exists and has the correct data structure.")
 df = pd.DataFrame(data)
 
 st.set_page_config(page_title="PhonePe Pulse Dashboard", layout="wide")
