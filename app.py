@@ -3,14 +3,17 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import os
+import json
+
+# Set Streamlit config FIRST
+st.set_page_config(page_title="PhonePe Pulse Dashboard", layout="wide")
 
 # Title
-st.title(" PhonePe Pulse Data Visualization")
+st.title("PhonePe Pulse Data Visualization")
 
 # Data path
 DATA_PATH = "pulse/data/aggregated/transaction/country/india/state/"
 
-# Load data
 @st.cache_data
 def load_data():
     all_data = []
@@ -21,31 +24,43 @@ def load_data():
             year_path = os.path.join(state_path, year)
             for quarter_file in os.listdir(year_path):
                 file_path = os.path.join(year_path, quarter_file)
-                df = pd.read_json(file_path)
-                df['state'] = state
-                df['year'] = int(year)
-                df['quarter'] = int(quarter_file.strip('.json'))
-                all_data.append(df)
+                with open(file_path, 'r') as f:
+                    json_data = json.load(f)
+                    data = json_data.get('data')
+                    if data is None:
+                        continue
+                    for entry in data['transactionData']:
+                        transaction_type = entry['name']
+                        count = entry['paymentInstruments'][0]['count']
+                        amount = entry['paymentInstruments'][0]['amount']
 
-    return pd.concat(all_data, ignore_index=True)
+                        all_data.append({
+                            'state': state,
+                            'year': int(year),
+                            'quarter': int(quarter_file.strip('.json')),
+                            'transaction_type': transaction_type,
+                            'count': count,
+                            'amount': amount
+                        })
+
+    return pd.DataFrame(all_data)
 
 try:
-    data = load_data()
+    df = load_data()
 
     st.subheader("Raw Transaction Data")
-    st.write(data.head())
+    st.write(df.head())
 
     st.subheader("Transactions by State")
-
     fig, ax = plt.subplots(figsize=(12, 6))
-    sns.barplot(data=data, x='state', y='data.transactionData[0].paymentInstruments[0].amount', ci=None, ax=ax)
+    sns.barplot(data=df, x='state', y='amount', ci=None, ax=ax)
     plt.xticks(rotation=90)
     st.pyplot(fig)
 
 except Exception as e:
-    st.error(f" An error occurred: {e}")
-    st.info(" Make sure the `pulse/` directory exists and has the correct data structure.")
-df = pd.DataFrame(data)
+    st.error(f"An error occurred: {e}")
+    st.info("Make sure the `pulse/` directory exists and has the correct data structure.")
+
 
 st.set_page_config(page_title="PhonePe Pulse Dashboard", layout="wide")
 
